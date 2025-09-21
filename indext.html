@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chennai Traffic Control Dashboard</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <style>
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: .5; }
+        }
+        .animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .animate-spin { animation: spin 1s linear infinite; }
+        
+        .transition-all { transition-property: all; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1); transition-duration: 300ms; }
+        .transition-colors { transition-property: background-color, border-color, color, fill, stroke; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1); transition-duration: 150ms; }
+        
+        .bg-gray-900 { background-color: #111827; }
+        .bg-gray-800 { background-color: #1f2937; }
+        .bg-gray-700 { background-color: #374151; }
+        .bg-gray-600 { background-color: #4b5563; }
+        .text-white { color: #ffffff; }
+        .text-gray-300 { color: #d1d5db; }
+        .text-gray-400 { color: #9ca3af; }
+        .border-gray-700 { border-color: #374151; }
+        .border-gray-600 { border-color: #4b5563; }
+        
+        .ring-4 { box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.5); }
+        .shadow-lg { box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); }
+        
+        .modal-overlay {
+            background-color: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+        }
+        
+        .street-pattern {
+            background-image: 
+                linear-gradient(rgba(75, 85, 99, 0.3) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(75, 85, 99, 0.3) 1px, transparent 1px);
+            background-size: 50px 50px;
+        }
+        
+        .gradient-bg {
+            background: linear-gradient(135deg, #475569 0%, #334155 50%, #1e293b 100%);
+        }
+    </style>
+</head>
+<body class="h-screen bg-gray-900 text-white">
+    <div id="dashboard" class="h-screen flex flex-col">
+        <!-- Header -->
+        <div class="bg-gray-800 p-4 flex justify-between items-center border-b border-gray-700">
+            <div class="flex items-center space-x-4">
+                <h1 class="text-xl font-bold text-blue-400">Chennai Traffic Control</h1>
+                <div id="current-time" class="text-sm text-gray-300"></div>
+            </div>
+            <div class="flex items-center space-x-6">
+                <div class="flex items-center space-x-2">
+                    <div class="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                    <span class="text-sm">System Online</span>
+                </div>
+                <div class="text-sm">
+                    Active Incidents: <span id="incident-count" class="text-red-400 font-bold">3</span>
+                </div>
+                <button id="emergency-toggle" class="px-4 py-2 rounded font-medium bg-gray-600 text-gray-300 hover:bg-gray-500 transition-colors">
+                    Emergency Mode OFF
+                </button>
+            </div>
+        </div>
+
+        <div class="flex-1 flex">
+            <!-- Left Panel -->
+            <div class="w-1/4 bg-gray-800 p-4 space-y-4 overflow-y-auto">
+                <!-- Junction Selector -->
+                <div>
+                    <h3 class="text-sm font-semibold mb-2 text-gray-300">Selected Junction</h3>
+                    <select id="junction-selector" class="w-full bg-gray-700 text-white p-2 rounded border border-gray-600 focus:border-blue-500 focus:outline-none">
+                        <option value="anna-salai-mount">Anna Salai - Mount Road</option>
+                        <option value="omr-sholinganallur">OMR - Sholinganallur</option>
+                        <option value="ecr-mahabalipuram">ECR - Mahabalipuram Rd</option>
+                    </select>
+                </div>
+
+                <!-- Live Metrics -->
+                <div class="bg-gray-700 p-3 rounded">
+                    <h3 class="text-sm font-semibold mb-3 text-gray-300">Live Metrics</h3>
+                    <div class="space-y-3" id="metrics-panel">
+                        <!-- Metrics will be populated by JavaScript -->
+                    </div>
+                </div>
+
+                <!-- Incident Feed -->
+                <div class="bg-gray-700 p-3 rounded flex-1">
+                    <h3 class="text-sm font-semibold mb-3 text-gray-300">Live Incidents</h3>
+                    <div class="space-y-2" id="incidents-feed">
+                        <!-- Incidents will be populated by JavaScript -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Center - Map View -->
+            <div class="flex-1 bg-gray-700 relative">
+                <div class="absolute top-4 left-4 bg-gray-800 p-2 rounded z-10">
+                    <h3 class="text-sm font-semibold text-gray-300 mb-2">Chennai Traffic Map</h3>
+                    <p class="text-xs text-gray-400">Real-time junction monitoring</p>
+                </div>
+                
+                <div class="w-full h-full relative gradient-bg">
+                    <div class="absolute inset-0 street-pattern opacity-30"></div>
+                    
+                    <!-- Junction Points -->
+                    <div id="map-junctions" class="relative w-full h-full">
+                        <!-- Junctions will be populated by JavaScript -->
+                    </div>
+                    
+                    <!-- Traffic flow indicators -->
+                    <div class="absolute bottom-20 left-4 space-y-1">
+                        <div class="w-2 h-8 bg-green-400 rounded-full animate-pulse"></div>
+                        <div class="w-2 h-8 bg-yellow-400 rounded-full animate-pulse" style="animation-delay: 0.5s;"></div>
+                        <div class="w-2 h-8 bg-red-400 rounded-full animate-pulse" style="animation-delay: 1s;"></div>
+                    </div>
+                    
+                    <!-- Legend -->
+                    <div class="absolute bottom-4 left-4 bg-gray-800 bg-opacity-90 p-3 rounded shadow-lg">
+                        <h4 class="text-xs font-semibold mb-2 text-white">Traffic Density</h4>
+                        <div class="space-y-1 text-xs">
+                            <div class="flex items-center space-x-2">
+                                <div class="w-3 h-3 bg-green-400 rounded-full"></div>
+                                <span class="text-gray-300">Low (0-40%)</span>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                <div class="w-3 h-3 bg-yellow-400 rounded-full"></div>
+                                <span class="text-gray-300">Medium (40-70%)</span>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                <div class="w-3 h-3 bg-red-400 rounded-full"></div>
+                                <span class="text-gray-300">High (70%+)</span>
+                            </div>
+                            <div class="flex items-center space-x-2 mt-2 pt-1 border-t border-gray-600">
+                                <div class="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
+                                <span class="text-gray-300">Emergency</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Map attribution -->
+                    <div class="absolute bottom-4 right-4 text-xs text-gray-400 bg-gray-800 bg-opacity-80 px-2 py-1 rounded">
+                        © OpenStreetMap contributors
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Panel -->
+            <div class="w-1/4 bg-gray-800 p-4 space-y-4 overflow-y-auto">
+                <!-- AI Recommendations -->
+                <div class="bg-gray-700 p-3 rounded">
+                    <h3 class="text-sm font-semibold mb-3 text-gray-300">AI Recommendations</h3>
+                    <div class="space-y-3" id="ai-recommendations">
+                        <!-- AI recommendations will be populated by JavaScript -->
+                    </div>
+                </div>
+
+                <!-- Signal Controls -->
+                <div class="bg-gray-700 p-3 rounded">
+                    <h3 class="text-sm font-semibold mb-3 text-gray-300">Signal Control</h3>
+                    <div class="space-y-3">
+                        <div class="flex justify-between items-center">
+                            <span class="text-xs text-gray-400">Manual Override</span>
+                            <button id="manual-override" class="px-3 py-1 rounded text-xs font-medium bg-gray-600 hover:bg-gray-500 text-white transition-colors">
+                                Override OFF
+                            </button>
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-2 mt-3" id="signal-controls">
+                            <!-- Signal control buttons will be populated by JavaScript -->
+                        </div>
+                        
+                        <div class="mt-3">
+                            <button id="emergency-preemption" class="w-full bg-yellow-600 hover:bg-yellow-700 text-white p-2 rounded text-xs font-medium transition-colors">
+                                Emergency Preemption
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- System Health -->
+                <div class="bg-gray-700 p-3 rounded">
+                    <h3 class="text-sm font-semibold mb-3 text-gray-300">System Health</h3>
+                    <div class="space-y-2">
+                        <div class="flex justify-between items-center">
+                            <span class="text-xs text-gray-400">Cameras Online</span>
+                            <div class="flex items-center space-x-1">
+                                <svg class="w-3 h-3 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                                </svg>
+                                <span class="text-xs text-green-400">24/24</span>
+                            </div>
+                        </div>
+                        
+                        <div class="flex justify-between items-center">
+                            <span class="text-xs text-gray-400">Model Performance</span>
+                            <div class="flex items-center space-x-1">
+                                <svg class="w-3 h-3 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                                </svg>
+                                <span class="text-xs text-green-400">98.5%</span>
+                            </div>
+                        </div>
+                        
+                        <div class="flex justify-between items-center">
+                            <span class="text-xs text-gray-400">Network Latency</span>
+                            <div class="flex items-center space-x-1">
+                                <svg class="w-3 h-3 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                                </svg>
+                                <span class="text-xs text-green-400">12ms</span>
+                            </div>
+                        </div>
+                        
+                        <div class="flex justify-between items-center">
+                            <span class="text-xs text-gray-400">Data Processing</span>
+                            <div class="flex items-center space-x-1">
+                                <div class="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                                <span class="text-xs text-green-400">Active</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Incident Detail Modal -->
+    <div id="incident-modal" class="fixed inset-0 modal-overlay flex items-center justify-center z-50 hidden">
+        <div class="bg-gray-800 p-6 rounded-lg max-w-2xl w-full mx-4 max-h-screen overflow-y-auto">
+            <div id="modal-content">
+                <!-- Modal content will be populated by JavaScript -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Dashboard State
+        let dashboardState = {
+            selectedJunction: 'anna-salai-mount',
+            emergencyMode: false,
+            manualOverride: false,
+            selectedIncident: null,
+            aiRecommendation: {
+                suggestion: 'Extend NS green phase by 15s to clear queue',
+                confidence: 93,
+                reason: 'High density detected, queue length increasing',
+                accepted: null
+            },
+            junctions: {
+                'anna-salai-mount': {
+                    name: 'Anna Salai - Mount Road',
+                    density: 85,
+                    queueLength: 12,
+                    waitTime: 95,
+                    status: 'high',
+                    phase: 'NS Green',
+                    timeLeft: 28,
+                    emergencyVehicle: false,
+                    accident: false,
+                    phases: ['NS Green', 'NS Yellow', 'NS Red', 'EW Green', 'EW Yellow', 'EW Red']
+                },
+                'omr-sholinganallur': {
+                    name: 'OMR - Sholinganallur',
+                    density: 62,
+                    queueLength: 8,
+                    waitTime: 45,
+                    status: 'medium',
+                    phase: 'EW Green',
+                    timeLeft: 15,
+                    emergencyVehicle: true,
+                    accident: false,
+                    phases: ['NS Green', 'NS Yellow', 'NS Red', 'EW Green', 'EW Yellow', 'EW Red']
+                },
+                'ecr-mahabalipuram': {
+                    name: 'ECR - Mahabalipuram Rd',
+                    density: 34,
+                    queueLength: 4,
+                    waitTime: 22,
+                    status: 'low',
+                    phase: 'NS Red',
+                    timeLeft: 8,
+                    emergencyVehicle: false,
+                    accident: true,
+                    phases: ['NS Green', 'NS Yellow', 'NS Red', 'EW Green', 'EW Yellow', 'EW Red']
+                }
+            },
+            incidents: [
+                {
+                    id: 1,
+                    type: 'emergency',
+                    location: 'OMR Junction',
+                    message: 'Ambulance approaching from south',
+                    time: '14:23',
+                    priority: 'high',
+                    details: 'Emergency vehicle detected via OpenCV. Estimated arrival: 2 minutes.',
+                    actions: ['Clear traffic signal', 'Alert nearby junctions', 'Contact emergency services'],
+                    resolved: false,
+                    vehicleType: 'Ambulance',
+                    direction: 'South to North',
+                    estimatedArrival: '2 min'
+                },
+                {
+                    id: 2,
+                    type: 'accident',
+                    location: 'ECR Junction',
+                    message: 'Minor collision detected',
+                    time: '14:20',
+                    priority: 'medium',
+                    details: 'OpenCV detected sudden stop pattern. 2 vehicles involved, minor damage.',
+                    actions: ['Dispatch traffic police', 'Contact nearest hospital', 'Redirect traffic', 'Clear debris'],
+                    resolved: false,
+                    severity: 'Minor',
+                    vehiclesInvolved: 2,
+                    injuries: 'None reported'
+                },
+                {
+                    id: 3,
+                    type: 'congestion',
+                    location: 'Anna Salai',
+                    message: 'Queue length exceeding threshold',
+                    time: '14:18',
+                    priority: 'low',
+                    details: 'Vehicle queue detected at 15+ vehicles. Suggested timing adjustment.',
+                    actions: ['Extend green phase', 'Optimize signal timing', 'Monitor queue length'],
+                    resolved: false,
+                    queueLength: 15,
+                    suggestion: 'Extend NS green by 20s'
+                }
+            ]
+        };
+
+        // Utility Functions
+        function getStatusColor(status) {
+            switch(status) {
+                case 'high': return 'bg-red-500';
+                case 'medium': return 'bg-yellow-500';
+                case 'low': return 'bg-green-500';
+                default: return 'bg-gray-500';
+            }
+        }
+
+        function getPriorityColor(priority) {
+            switch(priority) {
+                case 'high': return 'border-l-red-500 bg-red-50';
+                case 'medium': return 'border-l-yellow-500 bg-yellow-50';
+                case 'low': return 'border-l-blue-500 bg-blue-50';
+                default: return 'border-l-gray-500 bg-gray-50';
+            }
+        }
+
+        function getPhaseColor(phase) {
+            if (phase.includes('Green')) return 'text-green-400';
+            if (phase.includes('Yellow')) return 'text-yellow-400';
+            if (phase.includes('Red')) return 'text-red-400';
+            return 'text-gray-400';
+        }
+
+        function getIncidentIcon(type) {
+            switch(type) {
+                case 'emergency': return '⚡';
+                case 'accident': return '⚠️';
+                case 'congestion': return '👥';
+                default: return '🔔';
+            }
+        }
+
+        // Update Functions
+        function updateTime() {
+            const now = new Date();
+            document.getElementById('current-time').textContent = now.toLocaleTimeString();
+        }
+
+        function updateMetrics() {
+            const junction = dashboardState.junctions[dashboardState.selectedJunction];
+            const metricsPanel = document.getElementById('metrics-panel');
+            
+            metricsPanel.innerHTML = `
+                <div class="flex justify-between items-center">
+                    <span class="text-xs text-gray-400">Traffic Density</span>
+                    <div class="flex items-center space-x-2">
+                        <div class="w-20 bg-gray-600 rounded-full h-2">
+                            <div class="h-2 rounded-full transition-all duration-500 ${getStatusColor(junction.status)}" style="width: ${junction.density}%"></div>
+                        </div>
+                        <span class="text-sm font-bold">${Math.round(junction.density)}%</span>
+                    </div>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-xs text-gray-400">Queue Length</span>
+                    <span class="text-sm font-bold">${junction.queueLength} vehicles</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-xs text-gray-400">Avg Wait Time</span>
+                    <span class="text-sm font-bold">${Math.round(junction.waitTime)}s</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-xs text-gray-400">Current Phase</span>
+                    <span class="text-sm font-bold ${getPhaseColor(junction.phase)}">${junction.phase}</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-xs text-gray-400">Time Left</span>
+                    <span class="text-sm font-bold">${junction.timeLeft}s</span>
+                </div>
+                ${dashboardState.manualOverride ? '<div class="bg-yellow-900 p-2 rounded border border-yellow-600"><span class="text-xs text-yellow-300 font-medium">Manual Override Active</span></div>' : ''}
+            `;
+        }
+
+        function updateIncidentsFeed() {
+            const incidentsFeed = document.getElementById('incidents-feed');
+            const activeIncidents = dashboardState.incidents.filter(i => !i.resolved);
+            const resolvedIncidents = dashboardState.incidents.filter(i => i.resolved);
+            
+            document.getElementById('incident-count').textContent = activeIncidents.length;
+            
+            incidentsFeed.innerHTML = activeIncidents.map(incident => `
+                <div class="border-l-4 pl-3 py-2 rounded cursor-pointer hover:bg-opacity-80 ${getPriorityColor(incident.priority)}" data-incident-id="${incident.id}">
+                    <div class="flex items-center space-x-2 mb-1">
+                        <span class="text-sm">${getIncidentIcon(incident.type)}</span>
+                        <span class="text-xs font-medium text-gray-800">${incident.location}</span>
+                        <span class="text-xs text-gray-600">${incident.time}</span>
+                    </div>
+                    <p class="text-xs text-gray-700 mb-2">${incident.message}</p>
+                    <div class="flex space-x-2">
+                        <button onclick="viewIncident(${incident.id})" class="text-xs bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded transition-colors">View</button>
+                        <button onclick="resolveIncident(${incident.id}, '${incident.actions[0]}')" class="text-xs bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded transition-colors">Resolve</button>
+                    </div>
+                </div>
+            `).join('');
+            
+            if (resolvedIncidents.length > 0) {
+                incidentsFeed.innerHTML += `
+                    <div class="mt-4 pt-2 border-t border-gray-600">
+                        <h4 class="text-xs font-semibold text-gray-400 mb-2">Recently Resolved</h4>
+                        ${resolvedIncidents.slice(-2).map(incident => `
+                            <div class="bg-green-900 bg-opacity-50 p-2 rounded mb-2">
+                                <div class="flex items-center space-x-1">
+                                    <svg class="w-3 h-3 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                                    </svg>
+                                    <span class="text-xs text-green-300">${incident.location}</span>
+                                </div>
+                                <p class="text-xs text-green-200">Resolved: ${incident.resolvedAction}</p>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            }
+        }
+
+        function updateAIRecommendations() {
+            const aiPanel = document.getElementById('ai-recommendations');
+            const rec = dashboardState.aiRecommendation;
+            
+            let content = '';
+            
+            if (rec.accepted === null) {
+                content = `
+                    <div class="bg-blue-900 p-3 rounded border border-blue-700">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-xs font-medium text-blue-300">RL Model Suggestion</span>
+                            <span class="text-xs text-blue-400">${rec.confidence}% confidence</span>
+                        </div>
+                        <p class="text-xs text-blue-200 mb-2">${rec.suggestion}</p>
+                        <p class="text-xs text-blue-300 opacity-80 mb-3">${rec.reason}</p>
+                        <div class="flex space-x-2">
+                            <button onclick="acceptRecommendation()" class="text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded transition-colors">Accept</button>
+                            <button onclick="declineRecommendation()" class="text-xs bg-gray-600 hover:bg-gray-700 text-white px-3 py-1 rounded transition-colors">Decline</button>
+                        </div>
+                    </div>
+                `;
+            } else if (rec.accepted === true) {
+                content = `
+                    <div class="bg-green-900 p-3 rounded border border-green-700">
+                        <div class="flex items-center space-x-2 mb-1">
+                            <svg class="w-4 h-4 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                            </svg>
+                            <span class="text-xs font-medium text-green-300">Recommendation Applied</span>
+                        </div>
+                        <p class="text-xs text-green-200">Signal timing adjusted successfully</p>
+                    </div>
+                `;
+            } else {
+                content = `
+                    <div class="bg-red-900 p-3 rounded border border-red-700">
+                        <div class="flex items-center space-x-2 mb-1">
+                            <svg class="w-4 h-4 text-red-400" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm4.707-5.293a1 1 0 00-1.414-1.414L10 11.586l-3.293-3.293a1 1 0 00-1.414 1.414l4 4a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                            </svg>
+                            <span class="text-xs font-medium text-red-300">Recommendation Declined</span>
+                        </div>
+                        <p class="text-xs text-red-200">Manual control maintained</p>
+                    </div>
+                `;
+            }
+            
+            content += `
+                <div class="bg-green-900 p-2 rounded border border-green-700">
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="text-xs font-medium text-green-300">OpenCV Detection</span>
+                        <span class="text-xs text-green-400">Active</span>
+                    </div>
+                    <p class="text-xs text-green-200">Traffic flow analysis running</p>
+                </div>
+            `;
+            
+            aiPanel.innerHTML = content;
+        }
+
+        function updateMapJunctions() {
+            const mapJunctions = document.getElementById('map-junctions');
+            const junctions = Object.entries(dashboardState.junctions);
+            
+            mapJunctions.innerHTML = junctions.map(([key, junction], index) => {
+                const isSelected = dashboardState.selectedJunction === key;
+                const positionTop = 25 + index * 20;
+                const positionLeft = 15 + index * 35;
+                
+                let junctionColor = 'bg-green-400';
+                if (junction.emergencyVehicle) junctionColor = 'bg-red-500 animate-pulse';
+                else if (junction.accident) junctionColor = 'bg-yellow-500';
+                else if (junction.density > 70) junctionColor = 'bg-red-400';
+                else if (junction.density > 40) junctionColor = 'bg-yellow-400';
+                
+                return `
+                    <div class="absolute transform -translate-x-3 -translate-y-3 cursor-pointer transition-all duration-300 ${isSelected ? 'scale-150 z-20' : 'hover:scale-125 z-10'}" 
+                         style="top: ${positionTop}%; left: ${positionLeft}%;" 
+                         onclick="selectJunction('${key}')">
+                        <div class="w-8 h-8 rounded-full border-2 border-white shadow-lg ${isSelected ? 'ring-4 ring-blue-400 ring-opacity-60' : ''} ${junctionColor}">
+                            <div class="absolute -top-1 -right-1 w-3 h-3 rounded-full ${getPhaseColor(junction.phase).replace('text-', 'bg-')}"></div>
+                        </div>
+                        <div class="absolute -bottom-12 -left-12 text-xs whitespace-nowrap bg-gray-800 px-2 py-1 rounded shadow-lg transition-opacity ${isSelected ? 'opacity-100' : 'opacity-0 hover:opacity-100'}">
+                            <div class="text-white font-medium">${junction.name.split(' - ')[0]}</div>
+                            <div class="${getPhaseColor(junction.phase)}">${junction.phase} • ${junction.timeLeft}s</div>
+                            <div class="text-xs text-gray-300">Density: ${Math.round(junction.density)}%</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function updateSignalControls() {
+            const signalControls = document.getElementById('signal-controls');
+            const junction = dashboardState.junctions[dashboardState.selectedJunction];
+            
+            const phases = ['NS Green', 'NS Red', 'EW Green', 'EW Red'];
+            signalControls.innerHTML = phases.map(phase => {
+                const isActive = junction.phase === phase;
+                const isDisabled = !dashboardState.manualOverride;
+                const color = phase.includes('Green') ? 'green' : 'red';
+                
+                return `
+                    <button onclick="handleManualSignalControl('${phase}')" 
+                            ${isDisabled ? 'disabled' : ''}
+                            class="p-2 rounded text-xs font-medium transition-colors ${
+                                isDisabled 
+                                    ? 'bg-gray-600 text-gray-400 cursor-not-allowed' 
+                                    : isActive
+                                        ? `bg-${color}-600 text-white`
+                                        : `bg-${color}-500 hover:bg-${color}-600 text-white`
+                            }">
+                        ${phase}
+                    </button>
+                `;
+            }).join('');
+        }
+
+        // Event Handlers
+        function selectJunction(junctionId) {
+            dashboardState.selectedJunction = junctionId;
+            document.getElementById('junction-selector').value = junctionId;
+            updateDashboard();
+        }
+
+        function toggleEmergencyMode() {
+            dashboardState.emergencyMode = !dashboardState.emergencyMode;
+            const button = document.getElementById('emergency-toggle');
+            
+            if (dashboardState.emergencyMode) {
+                button.className = 'px-4 py-2 rounded font-medium bg-red-600 text-white transition-colors';
+                button.textContent = 'Emergency Mode ON';
+            } else {
+                button.className = 'px-4 py-2 rounded font-medium bg-gray-600 text-gray-300 hover:bg-gray-500 transition-colors';
+                button.textContent = 'Emergency Mode OFF';
+            }
+            updateDashboard();
+        }
+
+        function toggleManualOverride() {
+            dashboardState.manualOverride = !dashboardState.manualOverride;
+            const button = document.getElementById('manual-override');
+            
+            if (dashboardState.manualOverride) {
+                button.className = 'px-3 py-1 rounded text-xs font-medium bg-red-600 hover:bg-red-700 text-white transition-colors';
+                button.textContent = 'Override ON';
+            } else {
+                button.className = 'px-3 py-1 rounded text-xs font-medium bg-gray-600 hover:bg-gray-500 text-white transition-colors';
+                button.textContent = 'Override OFF';
+            }
+            updateDashboard();
+        }
+
+        function handleManualSignalControl(phase) {
+            if (dashboardState.manualOverride) {
+                dashboardState.junctions[dashboardState.selectedJunction].phase = phase;
+                dashboardState.junctions[dashboardState.selectedJunction].timeLeft = 30;
+                updateDashboard();
+            }
+        }
+
+        function handleEmergencyPreemption() {
+            dashboardState.emergencyMode = true;
+            dashboardState.junctions[dashboardState.selectedJunction].phase = 'NS Green';
+            dashboardState.junctions[dashboardState.selectedJunction].timeLeft = 60;
+            
+            const button = document.getElementById('emergency-toggle');
+            button.className = 'px-4 py-2 rounded font-medium bg-red-600 text-white transition-colors';
+            button.textContent = 'Emergency Mode ON';
+            
+            updateDashboard();
+        }
+
+        function acceptRecommendation() {
+            dashboardState.aiRecommendation.accepted = true;
+            dashboardState.junctions[dashboardState.selectedJunction].timeLeft += 15;
+            updateDashboard();
+            
+            // Generate new recommendation after 5 seconds
+            setTimeout(() => {
+                dashboardState.aiRecommendation = {
+                    suggestion: 'Optimize EW phase timing based on queue analysis',
+                    confidence: 87,
+                    reason: 'Traffic pattern analysis suggests timing adjustment',
+                    accepted: null
+                };
+                updateDashboard();
+            }, 5000);
+        }
+
+        function declineRecommendation() {
+            dashboardState.aiRecommendation.accepted = false;
+            updateDashboard();
+            
+            // Generate new recommendation after 3 seconds
+            setTimeout(() => {
+                dashboardState.aiRecommendation = {
+                    suggestion: 'Consider emergency vehicle priority routing',
+                    confidence: 91,
+                    reason: 'Emergency vehicle detected in nearby junction',
+                    accepted: null
+                };
+                updateDashboard();
+            }, 3000);
+        }
+
+        function viewIncident(incidentId) {
+            const incident = dashboardState.incidents.find(i => i.id === incidentId);
+            if (!incident) return;
+            
+            const modal = document.getElementById('incident-modal');
+            const modalContent = document.getElementById('modal-content');
+            
+            modalContent.innerHTML = `
+                <div class="flex justify-between items-start mb-4">
+                    <div>
+                        <h2 class="text-lg font-bold text-white mb-1">
+                            ${incident.type === 'emergency' ? '🚨 Emergency Vehicle' : ''}
+                            ${incident.type === 'accident' ? '⚠️ Traffic Accident' : ''}
+                            ${incident.type === 'congestion' ? '🚗 Traffic Congestion' : ''}
+                        </h2>
+                        <p class="text-sm text-gray-300">${incident.location} • ${incident.time}</p>
+                    </div>
+                    <button onclick="closeModal()" class="text-gray-400 hover:text-white">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <div class="w-full h-40 bg-gray-700 rounded flex items-center justify-center">
+                            <svg class="w-12 h-12 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                            </svg>
+                        </div>
+                        <p class="text-xs text-gray-400 mt-1">Live camera feed</p>
+                    </div>
+                    
+                    <div class="space-y-3">
+                        <div>
+                            <h4 class="text-sm font-semibold text-gray-300 mb-1">Details</h4>
+                            <p class="text-sm text-gray-200">${incident.details}</p>
+                        </div>
+                        
+                        ${incident.type === 'emergency' ? `
+                            <div class="space-y-2">
+                                <div class="flex justify-between">
+                                    <span class="text-xs text-gray-400">Vehicle Type:</span>
+                                    <span class="text-xs text-white">${incident.vehicleType}</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-xs text-gray-400">Direction:</span>
+                                    <span class="text-xs text-white">${incident.direction}</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-xs text-gray-400">ETA:</span>
+                                    <span class="text-xs text-red-400">${incident.estimatedArrival}</span>
+                                </div>
+                            </div>
+                        ` : ''}
+                        
+                        ${incident.type === 'accident' ? `
+                            <div class="space-y-2">
+                                <div class="flex justify-between">
+                                    <span class="text-xs text-gray-400">Severity:</span>
+                                    <span class="text-xs text-yellow-400">${incident.severity}</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-xs text-gray-400">Vehicles:</span>
+                                    <span class="text-xs text-white">${incident.vehiclesInvolved}</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-xs text-gray-400">Injuries:</span>
+                                    <span class="text-xs text-green-400">${incident.injuries}</span>
+                                </div>
+                            </div>
+                        ` : ''}
+                        
+                        ${incident.type === 'congestion' ? `
+                            <div class="space-y-2">
+                                <div class="flex justify-between">
+                                    <span class="text-xs text-gray-400">Queue Length:</span>
+                                    <span class="text-xs text-white">${incident.queueLength} vehicles</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-xs text-gray-400">AI Suggestion:</span>
+                                    <span class="text-xs text-blue-400">${incident.suggestion}</span>
+                                </div>
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+
+                <div>
+                    <h4 class="text-sm font-semibold text-gray-300 mb-3">Available Actions</h4>
+                    <div class="grid grid-cols-2 gap-2">
+                        ${incident.actions.map(action => {
+                            let buttonClass = 'bg-green-600 hover:bg-green-700';
+                            if (action.includes('emergency') || action.includes('hospital')) buttonClass = 'bg-red-600 hover:bg-red-700';
+                            else if (action.includes('police')) buttonClass = 'bg-blue-600 hover:bg-blue-700';
+                            else if (action.includes('Clear') || action.includes('Alert')) buttonClass = 'bg-yellow-600 hover:bg-yellow-700';
+                            
+                            return `
+                                <button onclick="resolveIncident(${incident.id}, '${action}'); closeModal();" 
+                                        class="p-3 rounded text-sm font-medium transition-colors text-white ${buttonClass}">
+                                    ${action.includes('hospital') ? '📞 ' : ''}${action.includes('police') ? '🚔 ' : ''}${action}
+                                </button>
+                            `;
+                        }).join('')}
+                    </div>
+                </div>
+            `;
+            
+            modal.classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('incident-modal').classList.add('hidden');
+        }
+
+        function resolveIncident(incidentId, action) {
+            const incidentIndex = dashboardState.incidents.findIndex(i => i.id === incidentId);
+            if (incidentIndex !== -1) {
+                dashboardState.incidents[incidentIndex].resolved = true;
+                dashboardState.incidents[incidentIndex].resolvedAction = action;
+                dashboardState.incidents[incidentIndex].resolvedTime = new Date().toLocaleTimeString();
+            }
+            
+            // Simulate action execution
+            if (action === 'Contact nearest hospital') {
+                alert('📞 Contacted Apollo Hospital Chennai - ETA: 8 minutes');
+            } else if (action === 'Dispatch traffic police') {
+                alert('🚔 Traffic police dispatched from T. Nagar station - ETA: 5 minutes');
+            } else if (action === 'Clear traffic signal') {
+                handleEmergencyPreemption();
+                alert('🚦 Emergency signal preemption activated');
+            } else if (action === 'Alert nearby junctions') {
+                alert('⚠️ Nearby junctions alerted - Emergency corridor established');
+            } else if (action === 'Contact emergency services') {
+                alert('🚨 Emergency services contacted - Ambulance priority granted');
+            } else if (action === 'Redirect traffic') {
+                alert('🚗 Traffic redirection activated via alternate routes');
+            }
+            
+            updateDashboard();
+        }
+
+        function updateDashboard() {
+            updateTime();
+            updateMetrics();
+            updateIncidentsFeed();
+            updateAIRecommendations();
+            updateMapJunctions();
+            updateSignalControls();
+        }
+
+        // Signal phase cycling
+        function cycleSignalPhases() {
+            if (!dashboardState.manualOverride) {
+                Object.keys(dashboardState.junctions).forEach(key => {
+                    const junction = dashboardState.junctions[key];
+                    
+                    if (junction.timeLeft > 0) {
+                        junction.timeLeft -= 1;
+                    } else {
+                        // Move to next phase
+                        const currentPhaseIndex = junction.phases.indexOf(junction.phase);
+                        const nextPhaseIndex = (currentPhaseIndex + 1) % junction.phases.length;
+                        junction.phase = junction.phases[nextPhaseIndex];
+                        
+                        // Set time for new phase
+                        if (junction.phase.includes('Yellow')) {
+                            junction.timeLeft = 5;
+                        } else if (junction.phase.includes('Green')) {
+                            junction.timeLeft = dashboardState.emergencyMode ? 60 : 30;
+                        } else {
+                            junction.timeLeft = dashboardState.emergencyMode ? 20 : 25;
+                        }
+                    }
+                });
+                updateDashboard();
+            }
+        }
+
+        // Simulate real-time data updates
+        function simulateTrafficData() {
+            const junction = dashboardState.junctions[dashboardState.selectedJunction];
+            junction.density = Math.max(10, Math.min(100, junction.density + (Math.random() - 0.5) * 5));
+            junction.waitTime = Math.max(5, junction.waitTime + (Math.random() - 0.5) * 10);
+            
+            // Update junction status based on density
+            if (junction.density > 70) junction.status = 'high';
+            else if (junction.density > 40) junction.status = 'medium';
+            else junction.status = 'low';
+            
+            updateDashboard();
+        }
+
+        // Initialize dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            // Set up event listeners
+            document.getElementById('emergency-toggle').addEventListener('click', toggleEmergencyMode);
+            document.getElementById('manual-override').addEventListener('click', toggleManualOverride);
+            document.getElementById('emergency-preemption').addEventListener('click', handleEmergencyPreemption);
+            document.getElementById('junction-selector').addEventListener('change', function(e) {
+                selectJunction(e.target.value);
+            });
+
+            // Close modal when clicking outside
+            document.getElementById('incident-modal').addEventListener('click', function(e) {
+                if (e.target === this) {
+                    closeModal();
+                }
+            });
+
+            // Initialize dashboard
+            updateDashboard();
+            
+            // Set up intervals
+            setInterval(updateTime, 1000);
+            setInterval(cycleSignalPhases, 1000);
+            setInterval(simulateTrafficData, 3000);
+        });
+    </script>
+</body>
+</html>
