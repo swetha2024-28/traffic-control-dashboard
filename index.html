@@ -728,32 +728,12 @@
                 `;
             }
         }
-function updateCameraFeed() {
-    const cameraContainer = document.getElementById('camera-feed-container');
-    //const junction = dashboardState.junctions[dashboardState.selectedJunction];
-    
-    //const currentJunction = cameraContainer.getAttribute('data-current-junction');
-   // if (currentJunction === dashboardState.selectedJunction) {
-    //    return;
-    //}
-    if (cameraContainer.innerHTML.trim() === '') {
-        const junction = dashboardState.junctions[dashboardState.selectedJunction];
-    
-    cameraContainer.innerHTML = `
-        <div class="camera-feed">
-            <video width="100%" height="100%" autoplay muted loop playsinline style="object-fit: cover;">
-                <source src="${trafficVideos[junction.videoId]}" type="video/mp4">
-                Your browser does not support the video tag.
-            </video>
-        </div>
-        <div class="text-xs text-gray-400 mt-1">Live feed from ${junction.name}</div>
-    `;
-    
-    cameraContainer.setAttribute('data-current-junction', dashboardState.selectedJunction);
-}
-       /* function updateCameraFeed() {
+
+        function updateCameraFeed() {
             const cameraContainer = document.getElementById('camera-feed-container');
-            const junction = dashboardState.junctions[dashboardState.selectedJunction];
+           // const junction = dashboardState.junctions[dashboardState.selectedJunction];
+           if (cameraContainer.innerHTML.trim() === '') {
+        const junction = dashboardState.junctions[dashboardState.selectedJunction];
             cameraContainer.innerHTML = `
             
                 <div class="camera-feed">
@@ -762,7 +742,7 @@ function updateCameraFeed() {
                 <div class="text-xs text-gray-400 mt-1">Live feed from ${junction.name}</div>
             `;
             
-        } */
+        } 
 
         function updateAIRecommendations() {
             const aiPanel = document.getElementById('ai-recommendations');
