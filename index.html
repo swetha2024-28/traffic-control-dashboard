@@ -729,19 +729,17 @@
             }
         }
 
-        function updateCameraFeed() {
+       function updateCameraFeed() {
             const cameraContainer = document.getElementById('camera-feed-container');
-           const junction = dashboardState.junctions[dashboardState.selectedJunction];
-        
-            cameraContainer.innerHTML = `
+            const junction = dashboardState.junctions[dashboardState.selectedJunction];
             
+            cameraContainer.innerHTML = `
                 <div class="camera-feed">
                     <iframe src="${trafficVideos[junction.videoId]}" frameborder="0" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen style="width:100%;height:100%;"></iframe>
                 </div>
                 <div class="text-xs text-gray-400 mt-1">Live feed from ${junction.name}</div>
             `;
-            
-        } 
+        }
 
         function updateAIRecommendations() {
             const aiPanel = document.getElementById('ai-recommendations');
