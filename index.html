@@ -6,6 +6,8 @@
     <title>Chennai Traffic Control Dashboard</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
     <style>
         @keyframes pulse {
             0%, 100% { opacity: 1; }
@@ -48,6 +50,205 @@
         
         .gradient-bg {
             background: linear-gradient(135deg, #475569 0%, #334155 50%, #1e293b 100%);
+        }
+        
+        /* Map container styling */
+        #map-container {
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+        
+        /* Custom marker styling */
+        .junction-marker {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            border: 3px solid white;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: white;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .junction-marker.selected {
+            transform: scale(1.4);
+            z-index: 1000;
+            box-shadow: 0 0 0 3px #3b82f6, 0 4px 15px rgba(0, 0, 0, 0.4);
+        }
+        
+        .junction-marker.low { background-color: #10b981; }
+        .junction-marker.medium { background-color: #f59e0b; }
+        .junction-marker.high { background-color: #ef4444; }
+        .junction-marker.emergency { 
+            background-color: #dc2626; 
+            animation: pulse 1s infinite;
+        }
+        
+        /* Custom popup styling */
+        .leaflet-popup-content-wrapper {
+            background: #1f2937;
+            color: #f9fafb;
+            border-radius: 8px;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+        }
+        
+        .leaflet-popup-tip {
+            background: #1f2937;
+        }
+        
+        .leaflet-popup-content {
+            margin: 12px 15px;
+            line-height: 1.4;
+        }
+        
+        .popup-content {
+            min-width: 200px;
+        }
+        
+        .popup-title {
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #3b82f6;
+        }
+        
+        .popup-detail {
+            display: flex;
+            justify-content: space-between;
+            margin: 3px 0;
+            font-size: 13px;
+        }
+        
+        .popup-label {
+            color: #9ca3af;
+        }
+        
+        .popup-value {
+            color: #f9fafb;
+            font-weight: 500;
+        }
+        
+        .popup-phase {
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid #374151;
+        }
+        
+        /* Traffic flow indicators */
+        .traffic-indicators {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        
+        .traffic-indicator {
+            width: 8px;
+            height: 32px;
+            border-radius: 4px;
+            animation: pulse 2s infinite;
+        }
+        
+        .traffic-indicator:nth-child(2) {
+            animation-delay: 0.5s;
+        }
+        
+        .traffic-indicator:nth-child(3) {
+            animation-delay: 1s;
+        }
+        
+        /* Traffic signal visualization */
+        .traffic-signal {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 10px;
+            padding: 5px;
+            background: #2d3748;
+            border-radius: 5px;
+        }
+        
+        .signal-direction {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        .signal-direction-label {
+            font-size: 10px;
+            margin-bottom: 5px;
+            color: #cbd5e0;
+        }
+        
+        .signal-lights {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+        
+        .signal-light {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            opacity: 0.3;
+        }
+        
+        .signal-light.active {
+            opacity: 1;
+            box-shadow: 0 0 5px currentColor;
+        }
+        
+        .signal-light.red { background-color: #ef4444; }
+        .signal-light.yellow { background-color: #f59e0b; }
+        .signal-light.green { background-color: #10b981; }
+        
+        /* Camera feed styling */
+        .camera-feed {
+            width: 100%;
+            height: 160px;
+            background: #000;
+            border-radius: 5px;
+            overflow: hidden;
+            margin-bottom: 10px;
+        }
+        
+        .camera-feed video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        .camera-placeholder {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #1a202c;
+            color: #718096;
+        }
+        
+        /* Button states */
+        .btn-accepted {
+            background-color: #10b981 !important;
+            cursor: not-allowed !important;
+        }
+        
+        .btn-declined {
+            background-color: #6b7280 !important;
+            cursor: not-allowed !important;
+        }
+        
+        .btn-resolved {
+            background-color: #10b981 !important;
+            cursor: not-allowed !important;
         }
     </style>
 </head>
@@ -110,53 +311,55 @@
                     <p class="text-xs text-gray-400">Real-time junction monitoring</p>
                 </div>
                 
-                <div class="w-full h-full relative gradient-bg">
-                    <div class="absolute inset-0 street-pattern opacity-30"></div>
-                    
-                    <!-- Junction Points -->
-                    <div id="map-junctions" class="relative w-full h-full">
-                        <!-- Junctions will be populated by JavaScript -->
-                    </div>
-                    
-                    <!-- Traffic flow indicators -->
-                    <div class="absolute bottom-20 left-4 space-y-1">
-                        <div class="w-2 h-8 bg-green-400 rounded-full animate-pulse"></div>
-                        <div class="w-2 h-8 bg-yellow-400 rounded-full animate-pulse" style="animation-delay: 0.5s;"></div>
-                        <div class="w-2 h-8 bg-red-400 rounded-full animate-pulse" style="animation-delay: 1s;"></div>
-                    </div>
-                    
-                    <!-- Legend -->
-                    <div class="absolute bottom-4 left-4 bg-gray-800 bg-opacity-90 p-3 rounded shadow-lg">
-                        <h4 class="text-xs font-semibold mb-2 text-white">Traffic Density</h4>
-                        <div class="space-y-1 text-xs">
-                            <div class="flex items-center space-x-2">
-                                <div class="w-3 h-3 bg-green-400 rounded-full"></div>
-                                <span class="text-gray-300">Low (0-40%)</span>
-                            </div>
-                            <div class="flex items-center space-x-2">
-                                <div class="w-3 h-3 bg-yellow-400 rounded-full"></div>
-                                <span class="text-gray-300">Medium (40-70%)</span>
-                            </div>
-                            <div class="flex items-center space-x-2">
-                                <div class="w-3 h-3 bg-red-400 rounded-full"></div>
-                                <span class="text-gray-300">High (70%+)</span>
-                            </div>
-                            <div class="flex items-center space-x-2 mt-2 pt-1 border-t border-gray-600">
-                                <div class="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
-                                <span class="text-gray-300">Emergency</span>
-                            </div>
+                <!-- Map Container -->
+                <div id="map-container"></div>
+                
+                <!-- Traffic flow indicators -->
+                <div class="traffic-indicators">
+                    <div class="traffic-indicator bg-green-400"></div>
+                    <div class="traffic-indicator bg-yellow-400"></div>
+                    <div class="traffic-indicator bg-red-400"></div>
+                </div>
+                
+                <!-- Legend -->
+                <div class="absolute bottom-4 left-20 bg-gray-800 bg-opacity-90 p-3 rounded shadow-lg z-10">
+                    <h4 class="text-xs font-semibold mb-2 text-white">Traffic Density</h4>
+                    <div class="space-y-1 text-xs">
+                        <div class="flex items-center space-x-2">
+                            <div class="w-3 h-3 bg-green-400 rounded-full"></div>
+                            <span class="text-gray-300">Low (0-40%)</span>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <div class="w-3 h-3 bg-yellow-400 rounded-full"></div>
+                            <span class="text-gray-300">Medium (40-70%)</span>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <div class="w-3 h-3 bg-red-400 rounded-full"></div>
+                            <span class="text-gray-300">High (70%+)</span>
+                        </div>
+                        <div class="flex items-center space-x-2 mt-2 pt-1 border-t border-gray-600">
+                            <div class="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
+                            <span class="text-gray-300">Emergency</span>
                         </div>
                     </div>
+                </div>
 
-                    <!-- Map attribution -->
-                    <div class="absolute bottom-4 right-4 text-xs text-gray-400 bg-gray-800 bg-opacity-80 px-2 py-1 rounded">
-                        © OpenStreetMap contributors
-                    </div>
+                <!-- Map attribution -->
+                <div class="absolute bottom-4 right-4 text-xs text-gray-400 bg-gray-800 bg-opacity-80 px-2 py-1 rounded z-10">
+                    © OpenStreetMap contributors
                 </div>
             </div>
 
             <!-- Right Panel -->
             <div class="w-1/4 bg-gray-800 p-4 space-y-4 overflow-y-auto">
+                <!-- Live Camera Feed -->
+                <div class="bg-gray-700 p-3 rounded">
+                    <h3 class="text-sm font-semibold mb-3 text-gray-300">Live Camera Feed</h3>
+                    <div id="camera-feed-container">
+                        <!-- Camera feed will be populated by JavaScript -->
+                    </div>
+                </div>
+
                 <!-- AI Recommendations -->
                 <div class="bg-gray-700 p-3 rounded">
                     <h3 class="text-sm font-semibold mb-3 text-gray-300">AI Recommendations</h3>
@@ -244,6 +447,9 @@
         </div>
     </div>
 
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+
     <script>
         // Dashboard State
         let dashboardState = {
@@ -268,7 +474,13 @@
                     timeLeft: 28,
                     emergencyVehicle: false,
                     accident: false,
-                    phases: ['NS Green', 'NS Yellow', 'NS Red', 'EW Green', 'EW Yellow', 'EW Red']
+                    phases: ['NS Green', 'NS Yellow', 'NS Red', 'EW Green', 'EW Yellow', 'EW Red'],
+                    coordinates: [13.0827, 80.2707], // Chennai center coordinates
+                    videoId: 'anna-salai', // Different video for each junction
+                    signalState: {
+                        NS: { red: false, yellow: false, green: true },
+                        EW: { red: true, yellow: false, green: false }
+                    }
                 },
                 'omr-sholinganallur': {
                     name: 'OMR - Sholinganallur',
@@ -280,7 +492,13 @@
                     timeLeft: 15,
                     emergencyVehicle: true,
                     accident: false,
-                    phases: ['NS Green', 'NS Yellow', 'NS Red', 'EW Green', 'EW Yellow', 'EW Red']
+                    phases: ['NS Green', 'NS Yellow', 'NS Red', 'EW Green', 'EW Yellow', 'EW Red'],
+                    coordinates: [12.8992, 80.2289], // OMR Sholinganallur coordinates
+                    videoId: 'omr', // Different video for each junction
+                    signalState: {
+                        NS: { red: true, yellow: false, green: false },
+                        EW: { red: false, yellow: false, green: true }
+                    }
                 },
                 'ecr-mahabalipuram': {
                     name: 'ECR - Mahabalipuram Rd',
@@ -292,7 +510,13 @@
                     timeLeft: 8,
                     emergencyVehicle: false,
                     accident: true,
-                    phases: ['NS Green', 'NS Yellow', 'NS Red', 'EW Green', 'EW Yellow', 'EW Red']
+                    phases: ['NS Green', 'NS Yellow', 'NS Red', 'EW Green', 'EW Yellow', 'EW Red'],
+                    coordinates: [12.6208, 80.1944], // ECR Mahabalipuram coordinates
+                    videoId: 'ecr', // Different video for each junction
+                    signalState: {
+                        NS: { red: true, yellow: false, green: false },
+                        EW: { red: false, yellow: false, green: true }
+                    }
                 }
             },
             incidents: [
@@ -308,7 +532,8 @@
                     resolved: false,
                     vehicleType: 'Ambulance',
                     direction: 'South to North',
-                    estimatedArrival: '2 min'
+                    estimatedArrival: '2 min',
+                    junctionId: 'omr-sholinganallur'
                 },
                 {
                     id: 2,
@@ -322,7 +547,8 @@
                     resolved: false,
                     severity: 'Minor',
                     vehiclesInvolved: 2,
-                    injuries: 'None reported'
+                    injuries: 'None reported',
+                    junctionId: 'ecr-mahabalipuram'
                 },
                 {
                     id: 3,
@@ -335,10 +561,50 @@
                     actions: ['Extend green phase', 'Optimize signal timing', 'Monitor queue length'],
                     resolved: false,
                     queueLength: 15,
-                    suggestion: 'Extend NS green by 20s'
+                    suggestion: 'Extend NS green by 20s',
+                    junctionId: 'anna-salai-mount'
                 }
-            ]
+            ],
+            // Track which popups are open
+            openPopups: {},
+            // Track resolved incidents
+            resolvedIncidents: {}
         };
+
+        // Traffic video URLs (unique for each junction)
+        const trafficVideos = {
+            'anna-salai': 'https://player.vimeo.com/video/807037240?h=2e4b0e8e8d&autoplay=1&loop=1&title=0&byline=0&portrait=0',
+            'omr': 'https://player.vimeo.com/video/807037240?h=2e4b0e8e8d&autoplay=1&loop=1&title=0&byline=0&portrait=0',
+            'ecr': 'https://player.vimeo.com/video/807037240?h=2e4b0e8e8d&autoplay=1&loop=1&title=0&byline=0&portrait=0'
+        };
+
+        // Map variables
+        let map;
+        let markers = {};
+
+        // Initialize the map
+        function initMap() {
+            // Create map centered on Chennai
+            map = L.map('map-container', {
+                zoomControl: true,
+                scrollWheelZoom: true,
+                doubleClickZoom: true,
+                boxZoom: true,
+                keyboard: true,
+                dragging: true,
+                zoomSnap: 0.5,
+                zoomDelta: 0.5
+            }).setView([13.0827, 80.2707], 11);
+            
+            // Add OpenStreetMap tiles
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+                maxZoom: 18
+            }).addTo(map);
+            
+            // Add junction markers to the map
+            updateMapJunctions();
+        }
 
         // Utility Functions
         function getStatusColor(status) {
@@ -422,7 +688,9 @@
             
             document.getElementById('incident-count').textContent = activeIncidents.length;
             
-            incidentsFeed.innerHTML = activeIncidents.map(incident => `
+            incidentsFeed.innerHTML = activeIncidents.map(incident => {
+                const isResolved = dashboardState.resolvedIncidents[incident.id];
+                return `
                 <div class="border-l-4 pl-3 py-2 rounded cursor-pointer hover:bg-opacity-80 ${getPriorityColor(incident.priority)}" data-incident-id="${incident.id}">
                     <div class="flex items-center space-x-2 mb-1">
                         <span class="text-sm">${getIncidentIcon(incident.type)}</span>
@@ -432,10 +700,14 @@
                     <p class="text-xs text-gray-700 mb-2">${incident.message}</p>
                     <div class="flex space-x-2">
                         <button onclick="viewIncident(${incident.id})" class="text-xs bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded transition-colors">View</button>
-                        <button onclick="resolveIncident(${incident.id}, '${incident.actions[0]}')" class="text-xs bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded transition-colors">Resolve</button>
+                        <button onclick="resolveIncident(${incident.id}, '${incident.actions[0]}')" 
+                                class="text-xs ${isResolved ? 'btn-resolved' : 'bg-green-600 hover:bg-green-700'} text-white px-2 py-1 rounded transition-colors"
+                                ${isResolved ? 'disabled' : ''}>
+                            ${isResolved ? 'Resolved' : 'Resolve'}
+                        </button>
                     </div>
                 </div>
-            `).join('');
+            `}).join('');
             
             if (resolvedIncidents.length > 0) {
                 incidentsFeed.innerHTML += `
@@ -455,6 +727,18 @@
                     </div>
                 `;
             }
+        }
+
+        function updateCameraFeed() {
+            const cameraContainer = document.getElementById('camera-feed-container');
+            const junction = dashboardState.junctions[dashboardState.selectedJunction];
+            
+            cameraContainer.innerHTML = `
+                <div class="camera-feed">
+                    <iframe src="${trafficVideos[junction.videoId]}" frameborder="0" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen style="width:100%;height:100%;"></iframe>
+                </div>
+                <div class="text-xs text-gray-400 mt-1">Live feed from ${junction.name}</div>
+            `;
         }
 
         function updateAIRecommendations() {
@@ -518,35 +802,122 @@
         }
 
         function updateMapJunctions() {
-            const mapJunctions = document.getElementById('map-junctions');
-            const junctions = Object.entries(dashboardState.junctions);
+            // Clear existing markers
+            Object.values(markers).forEach(marker => {
+                if (marker) map.removeLayer(marker);
+            });
+            markers = {};
             
-            mapJunctions.innerHTML = junctions.map(([key, junction], index) => {
+            // Add markers for each junction
+            Object.entries(dashboardState.junctions).forEach(([key, junction]) => {
                 const isSelected = dashboardState.selectedJunction === key;
-                const positionTop = 25 + index * 20;
-                const positionLeft = 15 + index * 35;
                 
-                let junctionColor = 'bg-green-400';
-                if (junction.emergencyVehicle) junctionColor = 'bg-red-500 animate-pulse';
-                else if (junction.accident) junctionColor = 'bg-yellow-500';
-                else if (junction.density > 70) junctionColor = 'bg-red-400';
-                else if (junction.density > 40) junctionColor = 'bg-yellow-400';
+                // Determine marker class based on junction status
+                let markerClass = junction.status;
+                if (junction.emergencyVehicle) markerClass = 'emergency';
                 
-                return `
-                    <div class="absolute transform -translate-x-3 -translate-y-3 cursor-pointer transition-all duration-300 ${isSelected ? 'scale-150 z-20' : 'hover:scale-125 z-10'}" 
-                         style="top: ${positionTop}%; left: ${positionLeft}%;" 
-                         onclick="selectJunction('${key}')">
-                        <div class="w-8 h-8 rounded-full border-2 border-white shadow-lg ${isSelected ? 'ring-4 ring-blue-400 ring-opacity-60' : ''} ${junctionColor}">
-                            <div class="absolute -top-1 -right-1 w-3 h-3 rounded-full ${getPhaseColor(junction.phase).replace('text-', 'bg-')}"></div>
+                // Create custom marker
+                const customIcon = L.divIcon({
+                    className: `junction-marker ${markerClass} ${isSelected ? 'selected' : ''}`,
+                    html: `<span>${Math.round(junction.density)}%</span>`,
+                    iconSize: [24, 24],
+                    iconAnchor: [12, 12]
+                });
+                
+                // Create marker and add to map
+                const marker = L.marker(junction.coordinates, { icon: customIcon })
+                    .addTo(map);
+                
+                // Create popup content with traffic signal visualization
+                const popupContent = `
+                    <div class="popup-content">
+                        <div class="popup-title">${junction.name}</div>
+                        <div class="popup-detail">
+                            <span class="popup-label">Density:</span>
+                            <span class="popup-value">${Math.round(junction.density)}%</span>
                         </div>
-                        <div class="absolute -bottom-12 -left-12 text-xs whitespace-nowrap bg-gray-800 px-2 py-1 rounded shadow-lg transition-opacity ${isSelected ? 'opacity-100' : 'opacity-0 hover:opacity-100'}">
-                            <div class="text-white font-medium">${junction.name.split(' - ')[0]}</div>
-                            <div class="${getPhaseColor(junction.phase)}">${junction.phase} • ${junction.timeLeft}s</div>
-                            <div class="text-xs text-gray-300">Density: ${Math.round(junction.density)}%</div>
+                        <div class="popup-detail">
+                            <span class="popup-label">Queue:</span>
+                            <span class="popup-value">${junction.queueLength} vehicles</span>
+                        </div>
+                        <div class="popup-detail">
+                            <span class="popup-label">Wait Time:</span>
+                            <span class="popup-value">${Math.round(junction.waitTime)}s</span>
+                        </div>
+                        <div class="popup-phase">
+                            <div class="popup-detail">
+                                <span class="popup-label">Signal:</span>
+                                <span class="popup-value ${getPhaseColor(junction.phase)}">${junction.phase}</span>
+                            </div>
+                            <div class="popup-detail">
+                                <span class="popup-label">Time Left:</span>
+                                <span class="popup-value">${junction.timeLeft}s</span>
+                            </div>
+                        </div>
+                        <div class="traffic-signal">
+                            <div class="signal-direction">
+                                <div class="signal-direction-label">N-S</div>
+                                <div class="signal-lights">
+                                    <div class="signal-light red ${junction.signalState.NS.red ? 'active' : ''}"></div>
+                                    <div class="signal-light yellow ${junction.signalState.NS.yellow ? 'active' : ''}"></div>
+                                    <div class="signal-light green ${junction.signalState.NS.green ? 'active' : ''}"></div>
+                                </div>
+                            </div>
+                            <div class="signal-direction">
+                                <div class="signal-direction-label">E-W</div>
+                                <div class="signal-lights">
+                                    <div class="signal-light red ${junction.signalState.EW.red ? 'active' : ''}"></div>
+                                    <div class="signal-light yellow ${junction.signalState.EW.yellow ? 'active' : ''}"></div>
+                                    <div class="signal-light green ${junction.signalState.EW.green ? 'active' : ''}"></div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 `;
-            }).join('');
+                
+                // Bind popup with close button functionality
+                marker.bindPopup(popupContent, {
+                    closeButton: true,
+                    autoClose: false,
+                    closeOnEscapeKey: true,
+                    autoPan: false // Prevent auto-panning which causes blinking
+                });
+                
+                // Store marker reference
+                markers[key] = marker;
+                
+                // Open popup if this junction is selected and popup is not already open
+                if (isSelected && dashboardState.openPopups[key]) {
+                    marker.openPopup();
+                }
+                
+                // Add click event to select junction and toggle popup
+                marker.on('click', () => {
+                    selectJunction(key);
+                    
+                    // Toggle popup
+                    if (dashboardState.openPopups[key]) {
+                        marker.closePopup();
+                        dashboardState.openPopups[key] = false;
+                    } else {
+                        // Close all other popups
+                        Object.keys(dashboardState.openPopups).forEach(junctionKey => {
+                            if (junctionKey !== key && dashboardState.openPopups[junctionKey]) {
+                                markers[junctionKey].closePopup();
+                                dashboardState.openPopups[junctionKey] = false;
+                            }
+                        });
+                        
+                        marker.openPopup();
+                        dashboardState.openPopups[key] = true;
+                    }
+                });
+                
+                // Handle popup close event
+                marker.on('popupclose', () => {
+                    dashboardState.openPopups[key] = false;
+                });
+            });
         }
 
         function updateSignalControls() {
@@ -573,6 +944,36 @@
                     </button>
                 `;
             }).join('');
+        }
+
+        // Update signal states based on current phase
+        function updateSignalStates() {
+            Object.keys(dashboardState.junctions).forEach(key => {
+                const junction = dashboardState.junctions[key];
+                
+                // Reset all signals
+                junction.signalState.NS = { red: false, yellow: false, green: false };
+                junction.signalState.EW = { red: false, yellow: false, green: false };
+                
+                // Set signals based on current phase
+                if (junction.phase.includes('NS Green')) {
+                    junction.signalState.NS.green = true;
+                    junction.signalState.EW.red = true;
+                } else if (junction.phase.includes('NS Yellow')) {
+                    junction.signalState.NS.yellow = true;
+                    junction.signalState.EW.red = true;
+                } else if (junction.phase.includes('EW Green')) {
+                    junction.signalState.NS.red = true;
+                    junction.signalState.EW.green = true;
+                } else if (junction.phase.includes('EW Yellow')) {
+                    junction.signalState.NS.red = true;
+                    junction.signalState.EW.yellow = true;
+                } else {
+                    // Default to NS red, EW red (shouldn't happen in normal operation)
+                    junction.signalState.NS.red = true;
+                    junction.signalState.EW.red = true;
+                }
+            });
         }
 
         // Event Handlers
@@ -614,6 +1015,7 @@
             if (dashboardState.manualOverride) {
                 dashboardState.junctions[dashboardState.selectedJunction].phase = phase;
                 dashboardState.junctions[dashboardState.selectedJunction].timeLeft = 30;
+                updateSignalStates();
                 updateDashboard();
             }
         }
@@ -622,6 +1024,7 @@
             dashboardState.emergencyMode = true;
             dashboardState.junctions[dashboardState.selectedJunction].phase = 'NS Green';
             dashboardState.junctions[dashboardState.selectedJunction].timeLeft = 60;
+            updateSignalStates();
             
             const button = document.getElementById('emergency-toggle');
             button.className = 'px-4 py-2 rounded font-medium bg-red-600 text-white transition-colors';
@@ -633,34 +1036,34 @@
         function acceptRecommendation() {
             dashboardState.aiRecommendation.accepted = true;
             dashboardState.junctions[dashboardState.selectedJunction].timeLeft += 15;
-            updateDashboard();
             
-            // Generate new recommendation after 5 seconds
-            setTimeout(() => {
-                dashboardState.aiRecommendation = {
-                    suggestion: 'Optimize EW phase timing based on queue analysis',
-                    confidence: 87,
-                    reason: 'Traffic pattern analysis suggests timing adjustment',
-                    accepted: null
-                };
-                updateDashboard();
-            }, 5000);
+            // Update button states
+            const aiPanel = document.getElementById('ai-recommendations');
+            const buttons = aiPanel.querySelectorAll('button');
+            buttons[0].className = 'text-xs btn-accepted text-white px-3 py-1 rounded';
+            buttons[0].textContent = 'Accepted';
+            buttons[0].disabled = true;
+            buttons[1].className = 'text-xs btn-declined text-white px-3 py-1 rounded';
+            buttons[1].textContent = 'Decline';
+            buttons[1].disabled = true;
+            
+            updateDashboard();
         }
 
         function declineRecommendation() {
             dashboardState.aiRecommendation.accepted = false;
-            updateDashboard();
             
-            // Generate new recommendation after 3 seconds
-            setTimeout(() => {
-                dashboardState.aiRecommendation = {
-                    suggestion: 'Consider emergency vehicle priority routing',
-                    confidence: 91,
-                    reason: 'Emergency vehicle detected in nearby junction',
-                    accepted: null
-                };
-                updateDashboard();
-            }, 3000);
+            // Update button states
+            const aiPanel = document.getElementById('ai-recommendations');
+            const buttons = aiPanel.querySelectorAll('button');
+            buttons[0].className = 'text-xs btn-declined text-white px-3 py-1 rounded';
+            buttons[0].textContent = 'Accept';
+            buttons[0].disabled = true;
+            buttons[1].className = 'text-xs btn-declined text-white px-3 py-1 rounded';
+            buttons[1].textContent = 'Declined';
+            buttons[1].disabled = true;
+            
+            updateDashboard();
         }
 
         function viewIncident(incidentId) {
@@ -669,6 +1072,7 @@
             
             const modal = document.getElementById('incident-modal');
             const modalContent = document.getElementById('modal-content');
+            const junction = dashboardState.junctions[incident.junctionId];
             
             modalContent.innerHTML = `
                 <div class="flex justify-between items-start mb-4">
@@ -689,12 +1093,10 @@
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     <div>
-                        <div class="w-full h-40 bg-gray-700 rounded flex items-center justify-center">
-                            <svg class="w-12 h-12 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
-                            </svg>
+                        <div class="camera-feed">
+                            <iframe src="${trafficVideos[junction.videoId]}" frameborder="0" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen style="width:100%;height:100%;"></iframe>
                         </div>
-                        <p class="text-xs text-gray-400 mt-1">Live camera feed</p>
+                        <p class="text-xs text-gray-400 mt-1">Live feed from ${junction.name}</p>
                     </div>
                     
                     <div class="space-y-3">
@@ -785,6 +1187,7 @@
                 dashboardState.incidents[incidentIndex].resolved = true;
                 dashboardState.incidents[incidentIndex].resolvedAction = action;
                 dashboardState.incidents[incidentIndex].resolvedTime = new Date().toLocaleTimeString();
+                dashboardState.resolvedIncidents[incidentId] = true;
             }
             
             // Simulate action execution
@@ -810,6 +1213,7 @@
             updateTime();
             updateMetrics();
             updateIncidentsFeed();
+            updateCameraFeed();
             updateAIRecommendations();
             updateMapJunctions();
             updateSignalControls();
@@ -839,6 +1243,9 @@
                         }
                     }
                 });
+                
+                // Update signal states based on new phases
+                updateSignalStates();
                 updateDashboard();
             }
         }
@@ -859,6 +1266,9 @@
 
         // Initialize dashboard
         document.addEventListener('DOMContentLoaded', function() {
+            // Initialize the map
+            initMap();
+            
             // Set up event listeners
             document.getElementById('emergency-toggle').addEventListener('click', toggleEmergencyMode);
             document.getElementById('manual-override').addEventListener('click', toggleManualOverride);
@@ -874,6 +1284,9 @@
                 }
             });
 
+            // Initialize signal states
+            updateSignalStates();
+            
             // Initialize dashboard
             updateDashboard();
             
