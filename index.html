@@ -730,12 +730,14 @@
         }
 function updateCameraFeed() {
     const cameraContainer = document.getElementById('camera-feed-container');
-    const junction = dashboardState.junctions[dashboardState.selectedJunction];
+    //const junction = dashboardState.junctions[dashboardState.selectedJunction];
     
-    const currentJunction = cameraContainer.getAttribute('data-current-junction');
-    if (currentJunction === dashboardState.selectedJunction) {
-        return;
-    }
+    //const currentJunction = cameraContainer.getAttribute('data-current-junction');
+   // if (currentJunction === dashboardState.selectedJunction) {
+    //    return;
+    //}
+    if (cameraContainer.innerHTML.trim() === '') {
+        const junction = dashboardState.junctions[dashboardState.selectedJunction];
     
     cameraContainer.innerHTML = `
         <div class="camera-feed">
